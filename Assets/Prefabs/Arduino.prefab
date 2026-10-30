@@ -47,6 +47,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ArduinoSerial
   portName: 
   baudRate: 9600
+  dataTimeout: 0.5
+  logConnectionChanges: 1
 --- !u!114 &7017493098061432769
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -59,20 +61,24 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e6d242712d0db9341a06c48939ea2e24, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ArduinoController
-  player: {fileID: 0}
-  throttle:
-    index: 0
+  cannon: {fileID: 0}
+  vertical:
+    min: 0
+    max: 1023
+    invert: 1
+    sensitivity: 1
+    noiseThreshold: 4
+    activityThreshold: 12
+    raw: 0
+    value: 0
+  horizontal:
     min: 0
     max: 1023
     invert: 0
-    deadZone: 0.05
+    sensitivity: 1
+    noiseThreshold: 4
+    activityThreshold: 12
     raw: 0
     value: 0
-  steering:
-    index: 1
-    min: 0
-    max: 1023
-    invert: 0
-    deadZone: 0.05
-    raw: 0
-    value: 0
+  buttonDebounce: 0.025
+  navigateMenusWithPotentiometers: 1
