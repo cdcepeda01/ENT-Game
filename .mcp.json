@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "unity-editor-mcp": {
-      "command": "unity",
-      "args": ["mcp"]
-    }
-  }
-}
