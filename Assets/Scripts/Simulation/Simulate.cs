@@ -27,7 +27,7 @@ public class Simulate : MonoBehaviour
         // Busca todos los scripts de la escena que implementan ISimulable.
         foreach (MonoBehaviour script in FindObjectsByType<MonoBehaviour>())
         {
-            if (script is ISimulable simulable) objects.Add(simulable);
+            if (script is ISimulable simulable && !objects.Contains(simulable)) objects.Add(simulable);
         }
         ResetSimulation();
     }
@@ -61,7 +61,12 @@ public class Simulate : MonoBehaviour
     /// <summary>Para objetos creados con Instantiate después de iniciar.</summary>
     public void Add(ISimulable obj)
     {
+        if (objects.Contains(obj)) return;
         objects.Add(obj);
         obj.ResetState();
     }
+
+    public bool IsRegistered(ISimulable obj) => objects.Contains(obj);
+
+    public void Remove(ISimulable obj) => objects.Remove(obj);
 }

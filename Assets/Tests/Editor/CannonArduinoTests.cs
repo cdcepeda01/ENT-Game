@@ -21,6 +21,32 @@ using Object = UnityEngine.Object;
 [Category("CannonArduino")]
 public class CannonArduinoTests
 {
+    [TestCase(0, 512)]
+    [TestCase(1023, 512)]
+    [TestCase(512, 0)]
+    [TestCase(512, 1023)]
+    public void SerialChannelsRemainIndependent(int a0, int a1)
+    {
+        var go = new GameObject("Axis isolation test");
+        var adapter = go.AddComponent<ArduinoController>();
+        try
+        {
+            long now = Stopwatch.GetTimestamp();
+            adapter.ProcessFrame(new ArduinoSerial.Frame(512, 512, false, false, 99, now));
+            Assert.That(ArduinoSerial.TryParseLine($"C1,{a0},{a1},0,0", out int v, out int h,
+                out bool menu, out bool fire), Is.True);
+            for (int i = 0; i < 4; i++)
+                adapter.ProcessFrame(new ArduinoSerial.Frame(v, h, menu, fire, 99, now));
+            Assert.That(adapter.vertical.raw, Is.EqualTo(a0));
+            Assert.That(adapter.horizontal.raw, Is.EqualTo(a1));
+            Assert.That(adapter.vertical.movement, Is.EqualTo(a0 == 512 ? 0f : a0 == 0 ? 1f : -1f));
+            Assert.That(adapter.horizontal.movement, Is.EqualTo(a1 == 512 ? 0f : a1 == 0 ? -1f : 1f));
+            Assert.That(a0 == 512 ? adapter.vertical.Revision : adapter.horizontal.Revision, Is.Zero,
+                "Mover un canal no debe activar el otro.");
+        }
+        finally { Object.DestroyImmediate(go); }
+    }
+
     [TestCase("C1,0,1023,0,1", true)]
     [TestCase("C1,512,256,1,0\r\n", true)]
     [TestCase("512,512,0,0", false)]
@@ -47,7 +73,7 @@ public class CannonArduinoTests
             axis.Sample(reading);
         Assert.That(axis.Revision, Is.Zero);
         Assert.That(axis.value, Is.EqualTo(512f / 1023f).Within(0.001f));
-        for (int reading = 513; reading <= 540; reading++) axis.Sample(reading);
+        for (int reading = 513; reading <= 610; reading++) axis.Sample(reading);
         Assert.That(axis.Revision, Is.GreaterThan(0), "Un giro lento también debe tomar el control.");
     }
 
@@ -71,7 +97,7 @@ public class CannonArduinoTests
         float current = owner.Resolve(0, 1, 10, -30, 30, true, axis, 0.15f, 90, 0.02f);
         Assert.That(owner.UsingArduino, Is.False);
         Assert.That(current, Is.GreaterThan(0));
-        axis.Sample(900); axis.Sample(900);
+        axis.Sample(900); axis.Sample(900); axis.Sample(900);
         current = owner.Resolve(current, 1, 10, -30, 30, true, axis, 0.15f, 90, 0.02f);
         Assert.That(owner.UsingArduino, Is.True, "Un giro posterior gana a una tecla que seguía mantenida.");
         Assert.That(otherOwner.UsingArduino, Is.False, "El otro eje conserva su dispositivo.");
@@ -83,11 +109,11 @@ public class CannonArduinoTests
     }
 
     [Test]
-    public void SmoothingIsBoundedAndMenuMovementDoesNotLeakIntoGameplay()
+    public void MovementIsBoundedAndMenuMovementDoesNotLeakIntoGameplay()
     {
         var axis = new ArduinoController.Axis();
         var owner = new CannonController.AxisOwner();
-        axis.Sample(0); axis.Sample(1023); axis.Sample(1023);
+        axis.Sample(0); axis.Sample(1023); axis.Sample(1023); axis.Sample(1023);
         float current = 0;
         for (int i = 0; i < 300; i++)
         {
@@ -99,6 +125,94 @@ public class CannonArduinoTests
         Assert.That(current, Is.EqualTo(30).Within(0.01));
         owner.Suspend(0, axis.Revision);
         Assert.That(owner.Resolve(5, 0, 10, -30, 30, true, axis, 0.15f, 40, 0.02f), Is.EqualTo(5));
+    }
+
+    [TestCase(false, 0, -1f)]
+    [TestCase(false, 512, 0f)]
+    [TestCase(false, 1023, 1f)]
+    [TestCase(true, 0, 1f)]
+    [TestCase(true, 512, 0f)]
+    [TestCase(true, 1023, -1f)]
+    public void PotentiometersProduceKeyboardDirections(bool invert, int raw, float expected)
+    {
+        var axis = new ArduinoController.Axis { invert = invert };
+        axis.Sample(raw);
+        Assert.That(axis.movement, Is.EqualTo(expected).Within(0.0001f));
+    }
+
+    [Test]
+    public void NeutralZoneDoesNotStealKeyboardEvenWhenReadingsChangeSignificantly()
+    {
+        var axis = new ArduinoController.Axis();
+        var owner = new CannonController.AxisOwner();
+        axis.Sample(512);
+        float angle = owner.Resolve(0, 1, 30, -60, 60, true, axis, 0.15f, 90, 0.02f);
+        foreach (int raw in new[] { 470, 470, 550, 550, 484, 484, 512, 512 })
+        {
+            axis.Sample(raw);
+            float next = owner.Resolve(angle, 1, 30, -60, 60, true, axis, 0.15f, 90, 0.02f);
+            Assert.That(next, Is.GreaterThan(angle));
+            Assert.That(owner.UsingArduino, Is.False);
+            angle = next;
+        }
+        Assert.That(axis.Revision, Is.Zero);
+    }
+
+    [Test]
+    public void DeflectedPotKeepsTurningAndCenterStopsAtTheCurrentAngle()
+    {
+        var axis = new ArduinoController.Axis();
+        var owner = new CannonController.AxisOwner();
+        axis.Sample(512); axis.Sample(1023); axis.Sample(1023); axis.Sample(1023);
+        int revision = axis.Revision;
+        float angle = 0;
+        for (int i = 0; i < 100; i++)
+            angle = owner.Resolve(angle, 0, 30, -180, 180, true, axis, 0.02f, 90, 0.02f);
+        float next = owner.Resolve(angle, 0, 30, -180, 180, true, axis, 0.02f, 90, 0.02f);
+        Assert.That(next - angle, Is.EqualTo(30 * 0.02f).Within(0.001f), "Misma velocidad máxima que D.");
+        Assert.That(axis.Revision, Is.EqualTo(revision), "No hace falta seguir girando físicamente el mando.");
+        axis.Sample(512); axis.Sample(512);
+        for (int i = 0; i < 50; i++)
+            Assert.That(owner.Resolve(next, 0, 30, -180, 180, true, axis, 0.15f, 90, 0.02f),
+                Is.EqualTo(next), "Centrar detiene; no devuelve la mira a otro ángulo.");
+    }
+
+    [Test]
+    public void AlternatingNoiseDoesNotMoveOrTakeControlFromKeyboard()
+    {
+        var axis = new ArduinoController.Axis();
+        var owner = new CannonController.AxisOwner();
+        axis.Sample(516);
+        float angle = 0;
+        for (int i = 0; i < 100; i++)
+        {
+            axis.Sample(i % 2 == 0 ? 408 : 595);
+            angle = owner.Resolve(angle, 1, 30, -180, 180, true, axis, 0.15f, 90, 0.02f);
+            Assert.That(axis.movement, Is.Zero);
+            Assert.That(axis.Revision, Is.Zero);
+            Assert.That(owner.UsingArduino, Is.False);
+        }
+        Assert.That(angle, Is.EqualTo(60).Within(0.001f));
+        axis.Sample(900); axis.Sample(900); axis.Sample(900);
+        Assert.That(axis.movement, Is.GreaterThan(0), "Una orden sostenida sí se acepta.");
+    }
+
+    [Test]
+    public void CenterStopsImmediatelyAndSameDirectionCanReclaimAfterKeyboard()
+    {
+        var axis = new ArduinoController.Axis();
+        var owner = new CannonController.AxisOwner();
+        axis.Sample(512);
+        for (int i = 0; i < 3; i++) axis.Sample(900);
+        owner.Resolve(0, 0, 30, -60, 60, true, axis, 0.15f, 90, 0.02f);
+        Assert.That(owner.UsingArduino, Is.True);
+        axis.Sample(512);
+        Assert.That(axis.movement, Is.Zero, "Soltar detiene sin esperar la mediana.");
+        owner.Resolve(0, -1, 30, -60, 60, true, axis, 0.15f, 90, 0.02f);
+        Assert.That(owner.UsingArduino, Is.False);
+        for (int i = 0; i < 3; i++) axis.Sample(900);
+        owner.Resolve(0, -1, 30, -60, 60, true, axis, 0.15f, 90, 0.02f);
+        Assert.That(owner.UsingArduino, Is.True);
     }
 
     // Emula exclusivamente la llegada de bytes ya interpretados. Controller.Update,
@@ -151,7 +265,45 @@ public class CannonArduinoTests
         GameObject confirm = null;
         try
         {
+            Assert.That(adapter.inputLayout, Is.EqualTo(ArduinoController.InputLayout.VerticalOnlyA0));
             yield return Pump(serial, 0.08f);
+            float verticalTestTurn = cannon.HorizontalAngle;
+            float verticalTestAim = cannon.VerticalAngle;
+            Quaternion verticalTestBase = cannon.transform.localRotation;
+            Transform testWheel = (Transform)Get(cannon, "wheelFrontLeft");
+            Quaternion wheelBefore = testWheel.localRotation;
+            yield return Pump(serial, 0.4f, 0, 1023);
+            Assert.That(cannon.VerticalAngle, Is.GreaterThan(verticalTestAim));
+            Assert.That(cannon.HorizontalAngle, Is.EqualTo(verticalTestTurn));
+            Assert.That(Quaternion.Angle(verticalTestBase, cannon.transform.localRotation), Is.LessThan(0.01f));
+            Assert.That(Quaternion.Angle(wheelBefore, testWheel.localRotation), Is.LessThan(0.01f));
+            adapter.inputLayout = ArduinoController.InputLayout.HorizontalOnlyA0;
+            yield return Pump(serial, 0.08f);
+            float singleAim = cannon.VerticalAngle;
+            float singleTurn = cannon.HorizontalAngle;
+            Transform singleBarrel = (Transform)Get(cannon, "barrel");
+            Quaternion singleBarrelRotation = singleBarrel.localRotation;
+            // El pin A1 sin conectar puede seguir a A0: ignorarlo incluso con valores extremos sostenidos.
+            yield return Pump(serial, 0.4f, 1023, 1023);
+            Assert.That(cannon.HorizontalAngle, Is.GreaterThan(singleTurn));
+            Assert.That(cannon.VerticalAngle, Is.EqualTo(singleAim));
+            Assert.That(Quaternion.Angle(singleBarrelRotation, singleBarrel.localRotation), Is.LessThan(0.01f));
+            float rightTurn = cannon.HorizontalAngle;
+            yield return Pump(serial, 0.5f, 0, 0);
+            Assert.That(cannon.HorizontalAngle, Is.LessThan(rightTurn));
+            Assert.That(cannon.VerticalAngle, Is.EqualTo(singleAim));
+            Assert.That(cannon.ArduinoOwnsVertical, Is.False);
+            yield return Pump(serial, 0.1f, 512, 1023);
+            float stoppedTurn = cannon.HorizontalAngle;
+            yield return Pump(serial, 0.2f, 512, 0);
+            Assert.That(cannon.HorizontalAngle, Is.EqualTo(stoppedTurn).Within(0.01f));
+            InputSystem.QueueStateEvent(keyboard, new KeyboardState(Key.W));
+            yield return Pump(serial, 0.15f);
+            Assert.That(cannon.VerticalAngle, Is.LessThan(singleAim), "W funciona también con Arduino solo horizontal.");
+            InputSystem.QueueStateEvent(keyboard, new KeyboardState());
+            // Conservar cobertura del montaje de dos ejes sin cambiar el prefab guardado.
+            adapter.inputLayout = ArduinoController.InputLayout.TwoAxes;
+            yield return Pump(serial, 0.1f);
             float initialAim = cannon.VerticalAngle;
             InputSystem.QueueStateEvent(keyboard, new KeyboardState(Key.W));
             yield return Pump(serial, 0.15f);
@@ -159,15 +311,25 @@ public class CannonArduinoTests
             InputSystem.QueueStateEvent(keyboard, new KeyboardState());
             yield return Pump(serial, 0.05f);
             float initialTurn = cannon.HorizontalAngle;
+            Quaternion baseBeforeVertical = cannon.transform.localRotation;
             yield return Pump(serial, 0.5f, 0, 512);
             Assert.That(cannon.VerticalAngle, Is.GreaterThan(initialAim));
             Assert.That(cannon.HorizontalAngle, Is.EqualTo(initialTurn).Within(0.01f));
             Assert.That(cannon.ArduinoOwnsHorizontal, Is.False);
-            yield return Pump(serial, 0.8f, 0, 512);
+            Assert.That(Quaternion.Angle(baseBeforeVertical, cannon.transform.localRotation), Is.LessThan(0.01f),
+                "A0 no debe rotar la base real del modelo.");
+            float beforeContinuing = cannon.VerticalAngle;
+            yield return Pump(serial, 0.3f, 0, 512);
+            Assert.That(cannon.VerticalAngle, Is.GreaterThan(beforeContinuing), "A0 descentrado sigue inclinando aunque su lectura sea constante.");
+            yield return Pump(serial, 0.1f, 512, 512);
             float settledAim = cannon.VerticalAngle;
-            yield return Pump(serial, 0.5f, 0, 1023);
+            Transform barrel = (Transform)Get(cannon, "barrel");
+            Quaternion barrelBeforeHorizontal = barrel.localRotation;
+            yield return Pump(serial, 0.5f, 512, 1023);
             Assert.That(cannon.HorizontalAngle, Is.GreaterThan(initialTurn));
-            Assert.That(cannon.VerticalAngle, Is.EqualTo(settledAim).Within(0.1f));
+            Assert.That(cannon.VerticalAngle, Is.EqualTo(settledAim).Within(0.01f), "A1 no debe cambiar la inclinación con A0 centrado.");
+            Assert.That(Quaternion.Angle(barrelBeforeHorizontal, barrel.localRotation), Is.LessThan(0.01f),
+                "A1 no debe cambiar la inclinación local del tubo real.");
             Assert.That(cannon.VerticalAngle, Is.InRange(cannon.aimRotationMin, cannon.aimRotationMax));
             Assert.That(cannon.HorizontalAngle, Is.InRange(cannon.turnRotationMin, cannon.turnRotationMax));
 
@@ -350,10 +512,11 @@ public static class CannonArduinoTestMenu
     }
 
     [MenuItem("Tools/Arduino/Run integration checks %#F8")]
+    [MenuItem("Tools/Simulation/Run cannon checks %#F9")]
     public static void Run()
     {
         Api.Execute(new ExecutionSettings(new Filter
-        { testMode = UnityEditor.TestTools.TestRunner.Api.TestMode.EditMode, categoryNames = new[] { "CannonArduino" } }));
+        { testMode = UnityEditor.TestTools.TestRunner.Api.TestMode.EditMode, categoryNames = new[] { "CannonArduino", "CannonRecoil" } }));
     }
 
     sealed class Results : ICallbacks

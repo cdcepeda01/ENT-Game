@@ -1,4 +1,21 @@
+## Prueba activa: VRy en A0
+
+El prefab usa Vertical Only A0: únicamente inclinación del barrel. A1 se ignora y el giro horizontal de Arduino queda deshabilitado. W/S y A/D siguen disponibles. Con USB desconectado, sustituir VRx por VRy en A0, conservando 5V y GND. No es necesario recargar firmware. Los modos horizontales descritos abajo quedan disponibles en Input Layout.
+
 # Cañón con Arduino y teclado
+
+## Configuración activa: solo VRx en A0
+
+El prefab Arduino está configurado en **Input Layout = Horizontal Only A0**.
+Conectar +5V y GND del joystick a la placa y VRx a A0. El giro horizontal usa
+exclusivamente A0; A1 se ignora, aunque esté desconectado o entregue valores extremos.
+Arduino no cambia la inclinación del barrel en este modo. W/S sigue inclinando
+con teclado y A/D sigue girando. No hace falta volver a cargar el sketch: C1
+conserva sus campos físicos A0 y A1, y Unity asigna el canal a la acción elegida.
+
+Para volver al montaje de dos ejes descrito abajo, seleccionar **Two Axes**
+(A0 vertical, A1 horizontal). **Horizontal Only A1** permite probar solo VRx en A1.
+Detener Play antes de cambiar la configuración que se quiere guardar.
 
 ## Estado y análisis del proyecto
 
@@ -26,6 +43,25 @@ Level_01 es la escena que actualmente tiene el cañón jugable. Level_02 y Level
 - Al entrar desde MainMenu, el Arduino y menú persistentes se reutilizan. No arrastrar otra copia dentro del cañón.
 
 ## Cableado propuesto (Arduino Uno/Nano clásico)
+
+### Montaje actual: dos joysticks KY-023
+
+| Pin | Joystick 1 (vertical) | Joystick 2 (horizontal) |
+|---|---|---|
+| +5V | 5V Arduino | 5V Arduino |
+| GND | GND Arduino | GND Arduino |
+| VRy | A0 | Sin conectar |
+| VRx | Sin conectar | A1 |
+| SW | Sin conectar; se conservan los botones externos | Sin conectar |
+
+Cada joystick utiliza un solo eje. Las señales A0 y A1 deben estar en filas
+independientes de la protoboard; solo alimentación y tierra se comparten.
+El firmware C1 existente es compatible sin cambios. Al soltar, ambos mandos
+deben permanecer dentro de la zona neutra (aproximadamente 461–563 con los
+valores predeterminados), sin oscilaciones grandes. Un canal inestable puede
+activar su eje aunque no se esté tocando ese joystick.
+
+### Montaje anterior con potenciómetros
 
 Dos potenciómetros lineales de aproximadamente 10 kΩ y dos pulsadores normalmente abiertos. Son pines propuestos: todas las constantes están al inicio del sketch.
 
@@ -59,6 +95,33 @@ El sketch presupone ADC de **10 bits (0–1023)**. Si se usa una placa con otra 
 Referencias: [lectura analógica oficial](https://docs.arduino.cc/tutorials/uno-rev3/AnalogReadSerial), [INPUT_PULLUP](https://docs.arduino.cc/language-reference/en/variables/constants/inputOutputPullup/).
 
 ## Comunicación
+
+### Diagnóstico de ejes cruzados
+
+El sketch toma A0 y A1 por separado, descarta la primera conversión al cambiar
+de canal y espera 200 microsegundos. Muestrea ambos canales aproximadamente cada
+1 ms y promedia las muestras acumuladas durante cada intervalo de envío de 25 ms,
+con un acumulador independiente por eje. Esto sustituye el promedio de ocho
+conversiones consecutivas, que no eliminaba las oscilaciones observadas entre paquetes.
+Los campos siguen siendo `C1,A0,A1,menu,disparo`: A0 solo controla W/S y A1 solo A/D.
+El filtrado no puede reparar un terminal central desconectado o unido al otro canal.
+Arduino documenta que una entrada desconectada puede fluctuar y depender de las otras
+entradas: [referencia analogRead](https://github.com/arduino/reference-en/blob/master/Language/Functions/Analog%20IO/analogRead.adoc).
+
+Comprobación física con Unity fuera de Play y Monitor Serie a 9600:
+1. Mover únicamente A0: solo debe variar el primer número después de C1.
+2. Mover únicamente A1: solo debe variar el segundo número.
+3. Si varían ambos con un único mando, revisar que los terminales centrales
+   no compartan la misma fila de protoboard; cada uno debe llegar a su propio pin.
+4. Si uno no responde, comprobar su terminal central, 5 V y GND común.
+5. Cerrar el Monitor Serie antes de iniciar Play.
+
+Capturas de diagnóstico de esta revisión: `Logs/Arduino-hardware-diagnostic.txt`
+y `Logs/Arduino-hardware-after.txt` (archivos locales ignorados por Git).
+En la primera captura A0 permaneció en 556 y A1 varió entre 494 y 583;
+en la posterior A0 permaneció en 556 y A1 varió entre 478 y 581.
+No hubo una maniobra física supervisada de cada potenciómetro, por lo que estas
+capturas no demuestran qué cable o componente falla ni validan el recorrido completo.
 
 ASCII CSV con cinco campos y fin de línea LF (CRLF también se acepta):
 
@@ -95,7 +158,9 @@ No hay selector manual de dispositivo y el Input System permanece activo.
 
 El movimiento se arbitra **independientemente por eje**. Un giro significativo del potenciómetro toma su eje; una pulsación posterior del teclado vuelve a tomarlo. Si ambos cambian en el mismo frame, gana el teclado. Una tecla mantenida no genera actividad nueva cada frame: para retomar el control tras un giro posterior, soltar y pulsar de nuevo.
 
-Una mediana de tres muestras rechaza picos; una histéresis de 4 unidades evita vibración y un cambio acumulado de 12 unidades determina actividad significativa. Conectar o dejar quietos los potenciómetros no reclama el control. Un giro lento sí acumula suficiente cambio. SmoothDamp y una velocidad máxima suavizan la llegada a cada ángulo.
+Los potenciómetros funcionan como W/S y A/D: **al centro se detienen; descentrados ordenan movimiento continuo en uno u otro sentido**, incluso si la lectura permanece fija. Cuanto mayor sea la desviación del centro, mayor será la velocidad, hasta Aim Speed o Turn Speed. Al volver al centro se conserva el ángulo alcanzado. No se convierte la posición del mando en un ángulo absoluto.
+
+Una mediana de tres muestras rechaza picos; una histéresis de 4 unidades evita vibración. Además, cada eje necesita tres paquetes consecutivos fuera del centro en el mismo sentido antes de activar movimiento (configurable con Direction Confirmation Samples). Un cambio acumulado de 12 unidades confirmado determina actividad significativa. Una señal que alterna de sentido no reclama el control al teclado. La zona muerta central predeterminada es del 10 % por lado. Conectar no reclama el control; las fluctuaciones dentro del centro tampoco impiden usar el teclado. SmoothDamp suaviza la orden de movimiento; una lectura en el centro la corta inmediatamente, sin esperar la confirmación.
 
 El menú usa el mismo EventSystem para ambos dispositivos. El potenciómetro vertical cambia la selección solo cuando se mueve significativamente; así una posición fija no impide navegar con teclado. D3 se convierte en Submit y nunca se dirige a Fire mientras hay un menú abierto. También se bloquea el frame de transición para evitar disparar al confirmar una opción que cierre el menú. Con ambos botones simultáneos tiene prioridad el menú.
 
@@ -104,7 +169,7 @@ El menú usa el mismo EventSystem para ambos dispositivos. El potenciómetro ver
 En **Assets/Prefabs/Arduino.prefab**:
 
 - ArduinoSerial: Port Name, Baud Rate, Data Timeout, Log Connection Changes.
-- ArduinoController: Vertical/Horizontal, Min/Max para calibrar el ADC, Invert, Sensitivity, Noise Threshold, Activity Threshold, Button Debounce y Navigate Menus With Potentiometers.
+- ArduinoController: Vertical/Horizontal, Min/Max para calibrar el ADC, Center (512 por defecto), Dead Zone (0,1), Invert, Sensitivity, Noise Threshold, Activity Threshold, Button Debounce y Navigate Menus With Potentiometers. Movement muestra la orden entre −1 y +1; 0 equivale a soltar las teclas.
 - Cannon puede quedar vacío: se busca el cañón activo. Raw y Value muestran la lectura y su valor normalizado durante Play.
 
 En el **CannonController de Level_01**:
@@ -112,7 +177,7 @@ En el **CannonController de Level_01**:
 - Aim Rotation Min/Max: ángulo X local permitido de la pieza barrel; actualmente −30° a +30°.
 - Turn Rotation Min/Max: giro Y local relativo a la orientación inicial de la base; actualmente −60° a +60°.
 - Aim Speed/Turn Speed: velocidades originales del teclado.
-- Arduino Smooth Time: 0,15 s; Arduino Max Speed: 90°/s por defecto.
+- Arduino Smooth Time: 0,15 s para suavizar la orden; Arduino Max Speed: límite adicional de 90°/s. La velocidad efectiva utiliza Aim Speed para A0 y Turn Speed para A1, igual que el teclado.
 - Shot Delay y Projectile Force: las restricciones existentes de disparo se comparten entre dispositivos.
 
 La inversión vertical predeterminada hace que un valor mayor eleve el cañón (X local negativo en este modelo). Invert permite ajustarlo al sentido del cableado. No se cambian padres, pivotes ni referencias de barrel, ruedas o punto de salida; se conservan los otros ejes locales.
@@ -131,11 +196,11 @@ La inversión vertical predeterminada hace que un valor mayor eleve el cañón (
 10. Si se cambian COM o Baud Rate durante Play, desactivar y activar **solo ArduinoSerial** para reiniciar el worker; también se aplican al volver a entrar en Play.
 11. Desconectar y reconectar USB durante la partida. El teclado debe seguir disponible y los botones mantenidos no deben activarse al reconectar.
 
-Configuración manual pendiente: identificar el modelo real de placa, cablear, cargar el sketch, indicar COM y calibrar los potenciómetros reales. No se cargó firmware ni se comprobó el circuito físico automáticamente.
+Se compiló y cargó el sketch actualizado en Arduino Uno, COM4 (3024 bytes de programa, 224 bytes de RAM). El puerto del prefab permanece automático. Tras el cambio del muestreo temporal, una captura real de 254 paquetes dio A0=516 y A1=496–525, dentro de la zona neutra. La captura anterior al cambio daba A1=408–595. Archivo local: `Logs/Joystick-temporal-filter.txt`. Esto verifica la mejora en reposo, no demuestra por sí solo la independencia física al mover cada joystick ni repara conexiones defectuosas.
 
 ## Pruebas y alcance
 
-Validación realizada: **18 pruebas aprobadas, 0 fallidas** en Unity 6000.6.0f1. Incluye la confirmación del botón real Level 1 desde MainMenu, la carga de Level_01 y la reutilización sin duplicados del menú y de los componentes Arduino.
+Validación actualizada: **41 pruebas aprobadas, 0 fallidas** en Unity 6000.6.0f1. Incluye órdenes equivalentes a W/S y A/D, giro continuo con lectura constante, parada inmediata en el centro, zona muerta que no interfiere con el teclado, menús, cambios de escena y retroceso físico. Las pruebas automáticas de entrada inyectan paquetes; se comprobó además la recepción de datos reales de la placa por COM3.
 
 En Unity: **Tools > Arduino > Run integration checks** (Ctrl+Shift+F8), o Test Runner, categoría CannonArduino. Guardar antes cualquier escena que se esté editando. Las pruebas cargan temporalmente Level_01, entran en Play y salen al terminar. El resultado se guarda en Logs/Arduino-test-results.xml.
 

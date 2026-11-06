@@ -1,6 +1,7 @@
 using UnityEngine;
 
 /// <summary>Una sola ruta de rotación/disparo; Input System y Arduino conservan sus entradas.</summary>
+[RequireComponent(typeof(CannonRecoil))]
 public class CannonController : MonoBehaviour
 {
     [SerializeField] private Transform barrel;
@@ -10,6 +11,7 @@ public class CannonController : MonoBehaviour
     [SerializeField] private Transform wheelBackRight;
     [SerializeField] private Transform wheelBackLeft;
     public GameObject projectilePrefab;
+    [Tooltip("Impulso aplicado al proyectil en N·s (kg·m/s). El cañón recibe el opuesto.")]
     public float projectileForce = 30f;
     public float aimSpeed = 10f;
     public float aimRotationMin = -10f;
@@ -19,11 +21,14 @@ public class CannonController : MonoBehaviour
     public float turnRotationMin = -30f;
     public float turnRotationMax = 30f;
     public float shotDelay = 0.5f;
-    [Header("Arduino: llegada suave al ángulo indicado por el potenciómetro")]
+    [Header("Arduino: control de velocidad equivalente a W/S y A/D")]
+    [Tooltip("Suavizado de la orden de movimiento. El centro detiene el eje inmediatamente.")]
     [Range(0.02f, 1f)] public float arduinoSmoothTime = 0.15f;
+    [Tooltip("Límite adicional en grados/s. Se conservan Aim Speed y Turn Speed del teclado.")]
     [Min(1f)] public float arduinoMaxSpeed = 90f;
 
     SimpleControls controls;
+    CannonRecoil recoil;
     float timeSinceLastShot;
     float aimAngle, turnAngle;
     Vector3 initialBarrelEuler, initialBaseEuler;
@@ -32,6 +37,7 @@ public class CannonController : MonoBehaviour
     readonly AxisOwner horizontalOwner = new AxisOwner();
     bool fireStartedInGameplay;
     int arduinoSession = -1;
+    ArduinoController.InputLayout arduinoLayout;
     public float VerticalAngle => aimAngle;
     public float HorizontalAngle => turnAngle;
     public bool ArduinoOwnsVertical => verticalOwner.UsingArduino;
@@ -41,6 +47,8 @@ public class CannonController : MonoBehaviour
 
     void Awake()
     {
+        recoil = GetComponent<CannonRecoil>();
+        if (recoil == null) recoil = gameObject.AddComponent<CannonRecoil>();
         controls = new SimpleControls();
         // Tap/SlowTap existentes siguen intactos. Recordar dónde empezó la pulsación
         // evita que su liberación dispare después de cerrar un menú.
@@ -70,9 +78,10 @@ public class CannonController : MonoBehaviour
         Vector2 move = controls.gameplay.move.ReadValue<Vector2>();
         ArduinoController arduino = ArduinoController.Instance;
         bool available = arduino != null && arduino.HasInput;
-        if (available && arduinoSession != arduino.InputSession)
+        if (available && (arduinoSession != arduino.InputSession || arduinoLayout != arduino.inputLayout))
         {
             arduinoSession = arduino.InputSession;
+            arduinoLayout = arduino.inputLayout;
             verticalOwner.Suspend(move.y, arduino.vertical.Revision);
             horizontalOwner.Suspend(move.x, arduino.horizontal.Revision);
         }
@@ -85,9 +94,9 @@ public class CannonController : MonoBehaviour
         }
         timeSinceLastShot += Time.deltaTime;
         aimAngle = verticalOwner.Resolve(aimAngle, move.y, aimSpeed, aimRotationMin, aimRotationMax,
-            available, available ? arduino.vertical : null, arduinoSmoothTime, arduinoMaxSpeed, Time.deltaTime);
+            available && arduino.VerticalInputEnabled, available ? arduino.vertical : null, arduinoSmoothTime, arduinoMaxSpeed, Time.deltaTime);
         turnAngle = horizontalOwner.Resolve(turnAngle, move.x, turnSpeed, turnRotationMin, turnRotationMax,
-            available, available ? arduino.horizontal : null, arduinoSmoothTime, arduinoMaxSpeed, Time.deltaTime);
+            available && arduino.HorizontalInputEnabled, available ? arduino.horizontal : null, arduinoSmoothTime, arduinoMaxSpeed, Time.deltaTime);
         ApplyRotation();
     }
 
@@ -119,8 +128,14 @@ public class CannonController : MonoBehaviour
         if (!isActiveAndEnabled || GameplayBlocked || timeSinceLastShot < shotDelay) return;
         if (projectilePrefab == null || barrelSpawnLocation == null) return;
         var cannonBall = Instantiate(projectilePrefab, barrelSpawnLocation.position, barrelSpawnLocation.rotation);
-        if (cannonBall.TryGetComponent(out Rigidbody body))
-            body.AddForce(cannonBall.transform.forward * projectileForce, ForceMode.Impulse);
+        if (cannonBall.TryGetComponent(out Rigidbody body) && !body.isKinematic)
+        {
+            Vector3 impulse = cannonBall.transform.forward * projectileForce;
+            // Antes de salir, la munición comparte la velocidad del cañón.
+            body.linearVelocity = recoil != null && recoil.isActiveAndEnabled ? recoil.Velocity : Vector3.zero;
+            body.AddForce(impulse, ForceMode.Impulse);
+            if (recoil != null) recoil.ApplyProjectileImpulse(impulse);
+        }
         timeSinceLastShot = 0f;
     }
 
@@ -129,22 +144,29 @@ public class CannonController : MonoBehaviour
     {
         public bool UsingArduino { get; private set; }
         int lastRevision;
-        float previousKeyboard, velocity;
-        public void Release() { UsingArduino = false; velocity = 0; lastRevision = 0; previousKeyboard = 0; }
+        float previousKeyboard, velocity, smoothedMovement;
+        public void Release() { UsingArduino = false; velocity = smoothedMovement = 0; lastRevision = 0; previousKeyboard = 0; }
         public void Suspend(float keyboard, int revision)
-        { UsingArduino = false; velocity = 0; previousKeyboard = keyboard; lastRevision = revision; }
+        { UsingArduino = false; velocity = smoothedMovement = 0; previousKeyboard = keyboard; lastRevision = revision; }
         public float Resolve(float current, float keyboard, float keyboardSpeed, float min, float max,
             bool available, ArduinoController.Axis arduino, float smoothTime, float maxSpeed, float deltaTime)
         {
             if (available && arduino.Revision != lastRevision) UsingArduino = true;
             if (!available || (Mathf.Abs(keyboard) > 0.1f && Mathf.Abs(keyboard - previousKeyboard) > 0.1f))
-            { UsingArduino = false; velocity = 0; }
+            { UsingArduino = false; velocity = smoothedMovement = 0; }
             previousKeyboard = keyboard;
             lastRevision = available ? arduino.Revision : 0;
             if (!UsingArduino) return Mathf.Clamp(current + keyboard * keyboardSpeed * deltaTime, min, max);
-            float target = Mathf.Lerp(min, max, arduino.value);
-            return Mathf.Clamp(Mathf.SmoothDamp(current, target, ref velocity,
-                Mathf.Max(0.02f, smoothTime), Mathf.Max(1f, maxSpeed), deltaTime), min, max);
+            // El potenciómetro indica dirección/velocidad, no un ángulo objetivo.
+            if (arduino.movement == 0f)
+            {
+                velocity = smoothedMovement = 0f;
+                return Mathf.Clamp(current, min, max);
+            }
+            smoothedMovement = Mathf.SmoothDamp(smoothedMovement, arduino.movement, ref velocity,
+                Mathf.Max(0.02f, smoothTime), Mathf.Infinity, deltaTime);
+            float speed = Mathf.Min(Mathf.Abs(keyboardSpeed), Mathf.Max(1f, maxSpeed));
+            return Mathf.Clamp(current + smoothedMovement * speed * deltaTime, min, max);
         }
     }
 }

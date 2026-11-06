@@ -61,10 +61,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e6d242712d0db9341a06c48939ea2e24, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ArduinoController
+  inputLayout: 3
   cannon: {fileID: 0}
   vertical:
     min: 0
     max: 1023
+    center: 512
+    deadZone: 0.1
     invert: 1
     sensitivity: 1
     noiseThreshold: 4
@@ -74,6 +77,8 @@ MonoBehaviour:
   horizontal:
     min: 0
     max: 1023
+    center: 512
+    deadZone: 0.1
     invert: 0
     sensitivity: 1
     noiseThreshold: 4

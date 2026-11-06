@@ -15438,6 +15438,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 1638347602806178, guid: 68a39471bcf807f45aace3b120f318f0, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1656139341}
+    - targetCorrespondingSourceObject: {fileID: 1638347602806178, guid: 68a39471bcf807f45aace3b120f318f0, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1656139342}
   m_SourcePrefab: {fileID: 100100000, guid: 68a39471bcf807f45aace3b120f318f0, type: 3}
 --- !u!1001 &986004973
 PrefabInstance:
@@ -24971,6 +24974,20 @@ MonoBehaviour:
   turnRotationMin: -60
   turnRotationMax: 60
   shotDelay: 1
+--- !u!114 &1656139342
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1656139340}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e117c6021a2f4a4e85dd0f3d45a726d8, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  cannonMass: 60
+  frictionCoefficient: 0.04
 --- !u!4 &1656139344 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 4501404751446666, guid: 68a39471bcf807f45aace3b120f318f0, type: 3}
