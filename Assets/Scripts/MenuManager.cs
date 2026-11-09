@@ -135,4 +135,108 @@ public class MenuManager : MonoBehaviour
         Application.Quit();
 #endif
     }
+
+    // ───────────── AGREGADO: pantallas Inicio / Tutorial / Pausa ─────────────
+
+    [Header("Pantallas ")]
+    [Tooltip("Panel con Jugar, Ver tutorial y Salir.")]
+    public GameObject panelInicio;
+    [Tooltip("Panel del tutorial, con Jugar y Volver.")]
+    public GameObject panelTutorial;
+    [Tooltip("Panel de pausa, con Continuar, Reiniciar y Volver al menú.")]
+    public GameObject panelPausa;
+
+    [Header("Escenas ")]
+    public string escenaMenu = "MainMenu";
+    public string escenaJuego = "Level_01";
+
+    bool viendoTutorial;
+
+    // Muestra el panel que corresponde según la escena en la que se esté.
+    void Update()
+    {
+        bool enMenu = SceneManager.GetActiveScene().name == escenaMenu;
+        if (!enMenu) viendoTutorial = false;
+        Mostrar(panelInicio, enMenu && !viendoTutorial);
+        Mostrar(panelTutorial, enMenu && viendoTutorial);
+        Mostrar(panelPausa, !enMenu);
+    }
+
+    static void Mostrar(GameObject panel, bool visible)
+    {
+        if (panel != null && panel.activeSelf != visible) panel.SetActive(visible);
+    }
+
+    // Botón "Jugar" (en Inicio y en Tutorial).
+    public void Jugar()
+    {
+        viendoTutorial = false;
+        CargarEscena(escenaJuego, false);
+    }
+
+    // Botón "Ver tutorial".
+    public void VerTutorial()
+    {
+        viendoTutorial = true;
+        Update();
+        if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
+        EnsureSelection();
+    }
+
+    // Botón "Volver" dentro del tutorial.
+    public void VolverAlInicio()
+    {
+        viendoTutorial = false;
+        Update();
+        if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
+        EnsureSelection();
+    }
+
+    // Botón "Continuar" de la pausa.
+    public void Continuar()
+    {
+        if (SceneManager.GetActiveScene().name == escenaMenu) return;
+        if (isMainMenuShowing) ToggleMenu();
+    }
+
+    // Botón "Reiniciar" de la pausa.
+    public void Reiniciar()
+    {
+        CargarEscena(SceneManager.GetActiveScene().name, false);
+    }
+
+    // Botón "Volver al menú" de la pausa.
+    public void IrAlMenu()
+    {
+        viendoTutorial = false;
+        CargarEscena(escenaMenu, true);
+    }
+
+    // Botón "Salir".
+    public void Salir()
+    {
+        QuitApplication();
+    }
+
+    // Botón "Jugar" de la pantalla Tutorial: carga el nivel con el tutorial guiado.
+    public void ComenzarTutorial()
+    {
+        TutorialGuiado.Activo = true;
+        viendoTutorial = false;
+        CargarEscena(escenaTutorial, false);
+    }
+
+    [Header("Escena del tutorial")]
+    public string escenaTutorial = "Level_03";
+
+    void CargarEscena(string nombre, bool mostrarMenu)
+    {
+        if (!Application.CanStreamedLevelBeLoaded(nombre))
+        {
+            Debug.LogWarning($"La escena '{nombre}' no está en Build Profiles.", this);
+            return;
+        }
+        SetVisible(mostrarMenu);
+        SceneManager.LoadScene(nombre);
+    }
 }
