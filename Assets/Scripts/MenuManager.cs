@@ -3,7 +3,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-/// <summary>El mismo menú y CanvasGroup para teclado, ratón y Arduino.</summary>
+
 public class MenuManager : MonoBehaviour
 {
     public static MenuManager Instance { get; private set; }
@@ -159,7 +159,10 @@ public class MenuManager : MonoBehaviour
         if (!enMenu) viendoTutorial = false;
         Mostrar(panelInicio, enMenu && !viendoTutorial);
         Mostrar(panelTutorial, enMenu && viendoTutorial);
-        Mostrar(panelPausa, !enMenu);
+        Mostrar(panelPausa, !enMenu && !mostrandoFin);
+        Mostrar(panelFin, !enMenu && mostrandoFin);
+        // La pantalla final no se puede cerrar con Esc: se vuelve a mostrar.
+        if (mostrandoFin && !enMenu && !isMainMenuShowing) SetVisible(true);
     }
 
     static void Mostrar(GameObject panel, bool visible)
@@ -236,7 +239,39 @@ public class MenuManager : MonoBehaviour
             Debug.LogWarning($"La escena '{nombre}' no está en Build Profiles.", this);
             return;
         }
+        mostrandoFin = false;
         SetVisible(mostrarMenu);
         SceneManager.LoadScene(nombre);
+    }
+
+    // ───────────── AGREGADO: pantalla final de la partida ─────────────
+
+    [Header("Pantalla final")]
+    [Tooltip("Panel con el puntaje, el récord, Volver a jugar y Menú.")]
+    public GameObject panelFin;
+    [Tooltip("Texto donde se escribe el puntaje de la partida.")]
+    public TMPro.TMP_Text textoPuntajeFin;
+    [Tooltip("Texto donde se escribe el récord (o ¡NUEVO RÉCORD!).")]
+    public TMPro.TMP_Text textoRecordFin;
+
+    bool mostrandoFin;
+
+    /// <summary>La llama ControlPartida cuando se acaba el tiempo.</summary>
+    public void MostrarFin(int puntos, int record, bool nuevoRecord)
+    {
+        if (textoPuntajeFin != null) textoPuntajeFin.text = $"Puntos: {puntos}";
+        if (textoRecordFin != null)
+            textoRecordFin.text = nuevoRecord ? "¡NUEVO RÉCORD!" : $"Récord: {record}";
+        mostrandoFin = true;
+        Update();
+        SetVisible(true);
+        if (EventSystem.current != null) EventSystem.current.SetSelectedGameObject(null);
+        EnsureSelection();
+    }
+
+    // Botón "Volver a jugar" de la pantalla final.
+    public void VolverAJugar()
+    {
+        CargarEscena(SceneManager.GetActiveScene().name, false);
     }
 }
