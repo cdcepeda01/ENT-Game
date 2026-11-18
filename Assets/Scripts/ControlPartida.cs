@@ -68,8 +68,12 @@ public class ControlPartida : MonoBehaviour
 
     void ActualizarTextos()
     {
-        if (textoTiempo != null) textoTiempo.text = $"Tiempo: {Mathf.CeilToInt(tiempoRestante)}";
-        if (textoPuntos != null) textoPuntos.text = $"Puntos: {puntos}";
+        int segundos = Mathf.CeilToInt(tiempoRestante);
+        string color = segundos <= 10 ? "FF9A82" : "FFF5DF";
+        if (textoTiempo != null)
+            textoTiempo.text = $"<size=26><color=#D7B77C>Tiempo restante</color></size>\n<color=#{color}>{segundos / 60:00}:{segundos % 60:00}</color>";
+        if (textoPuntos != null)
+            textoPuntos.text = $"<color=#A51D2D><size=28>Puntos</size>\n{puntos:N0}</color>";
     }
 
     IEnumerator Terminar()

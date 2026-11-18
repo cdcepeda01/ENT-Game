@@ -238,6 +238,65 @@ public class CannonArduinoTests
     static int Shots() => Object.FindObjectsByType<Rigidbody>().Count(b => b.name == "ArduinoTestProjectile(Clone)");
 
     [UnityTest]
+    public IEnumerator CastilloJoysticksMoveOnlyTheirAssignedTransform()
+    {
+        yield return new EnterPlayMode();
+        SceneManager.LoadScene("Level_Castillo");
+        yield return null;
+        var cannon = Object.FindAnyObjectByType<CannonController>();
+        var serial = ArduinoSerial.Instance;
+        var adapter = ArduinoController.Instance;
+        Assert.That(adapter.inputLayout, Is.EqualTo(ArduinoController.InputLayout.HorizontalA0VerticalA1));
+        serial.enabled = false;
+        Time.timeScale = 1f;
+        var barrel = (Transform)Get(cannon, "barrel");
+        Assert.That(barrel.name, Is.EqualTo("Barrel"));
+        var wheels = new[] { "wheelFrontLeft", "wheelFrontRight", "wheelBackLeft", "wheelBackRight" }
+            .Select(n => (Transform)Get(cannon, n)).ToArray();
+        yield return Pump(serial, 0.1f, 518, 496);
+        var pitch = barrel.localRotation;
+        var yaw = cannon.transform.localRotation;
+        yield return Pump(serial, 0.4f, 1023, 496);
+        Assert.That(Quaternion.Angle(barrel.localRotation, pitch), Is.LessThan(0.01f), "A0 no debe inclinar el Barrel.");
+        Assert.That(Quaternion.Angle(cannon.transform.localRotation, yaw), Is.GreaterThan(0.1f));
+        yield return Pump(serial, 0.1f, 518, 496);
+        yaw = cannon.transform.localRotation;
+        var wheelRotations = wheels.Select(t => t.localRotation).ToArray();
+        yield return Pump(serial, 0.4f, 518, 0);
+        Assert.That(Quaternion.Angle(barrel.localRotation, pitch), Is.GreaterThan(0.1f));
+        Assert.That(Quaternion.Angle(cannon.transform.localRotation, yaw), Is.LessThan(0.01f), "A1 no debe girar la base.");
+        for (int i = 0; i < wheels.Length; i++)
+            Assert.That(Quaternion.Angle(wheels[i].localRotation, wheelRotations[i]), Is.LessThan(0.01f), "A1 no debe mover las ruedas.");
+        yield return Pump(serial, 1.1f);
+        var probe = new GameObject("ArduinoTestProjectile");
+        probe.transform.position = Vector3.one * 10000;
+        probe.AddComponent<Rigidbody>().useGravity = false;
+        var original = cannon.projectilePrefab;
+        cannon.projectilePrefab = probe;
+        try
+        {
+            int before = Shots();
+            yield return Pump(serial, 0.12f, fire: true);
+            Assert.That(Shots(), Is.EqualTo(before + 1), "D3 debe disparar en Castillo.");
+            yield return Pump(serial, 1.1f, fire: true);
+            Assert.That(Shots(), Is.EqualTo(before + 1), "Mantener D3 no debe repetir disparos.");
+            yield return Pump(serial, 0.1f);
+            yield return Pump(serial, 0.12f, menu: true);
+            Assert.That(MenuManager.IsAnyMenuOpen, Is.True, "D2 debe abrir el menú de Castillo.");
+            yield return Pump(serial, 0.1f);
+            yield return Pump(serial, 0.12f, menu: true);
+            Assert.That(MenuManager.IsAnyMenuOpen, Is.False, "D2 debe cerrar el menú de Castillo.");
+        }
+        finally
+        {
+            cannon.projectilePrefab = original;
+            Object.Destroy(probe);
+            foreach (Rigidbody body in Object.FindObjectsByType<Rigidbody>())
+                if (body.name == "ArduinoTestProjectile(Clone)") Object.Destroy(body.gameObject);
+        }
+    }
+
+    [UnityTest]
     public IEnumerator RealSceneSupportsKeyboardArduinoMenusAndReconnect()
     {
         yield return new EnterPlayMode();
@@ -265,7 +324,19 @@ public class CannonArduinoTests
         GameObject confirm = null;
         try
         {
-            Assert.That(adapter.inputLayout, Is.EqualTo(ArduinoController.InputLayout.VerticalOnlyA0));
+            Assert.That(adapter.inputLayout, Is.EqualTo(ArduinoController.InputLayout.HorizontalA0VerticalA1));
+            yield return Pump(serial, 0.1f);
+            float mappedAim = cannon.VerticalAngle;
+            float mappedTurn = cannon.HorizontalAngle;
+            yield return Pump(serial, 0.4f, 1023, 512);
+            Assert.That(cannon.HorizontalAngle, Is.GreaterThan(mappedTurn));
+            Assert.That(cannon.VerticalAngle, Is.EqualTo(mappedAim));
+            yield return Pump(serial, 0.1f);
+            mappedTurn = cannon.HorizontalAngle;
+            yield return Pump(serial, 0.4f, 512, 0);
+            Assert.That(cannon.VerticalAngle, Is.GreaterThan(mappedAim));
+            Assert.That(cannon.HorizontalAngle, Is.EqualTo(mappedTurn));
+            adapter.inputLayout = ArduinoController.InputLayout.VerticalOnlyA0;
             yield return Pump(serial, 0.08f);
             float verticalTestTurn = cannon.HorizontalAngle;
             float verticalTestAim = cannon.VerticalAngle;
@@ -518,6 +589,11 @@ public static class CannonArduinoTestMenu
         Api.Execute(new ExecutionSettings(new Filter
         { testMode = UnityEditor.TestTools.TestRunner.Api.TestMode.EditMode, categoryNames = new[] { "CannonArduino", "CannonRecoil" } }));
     }
+
+    [MenuItem("Tools/Arduino/Check Castillo axes %#F10")]
+    public static void RunCastillo() => Api.Execute(new ExecutionSettings(new Filter
+    { testMode = UnityEditor.TestTools.TestRunner.Api.TestMode.EditMode,
+        testNames = new[] { "CannonArduinoTests.CastilloJoysticksMoveOnlyTheirAssignedTransform" } }));
 
     sealed class Results : ICallbacks
     {

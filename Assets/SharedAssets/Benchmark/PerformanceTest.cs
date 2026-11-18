@@ -66,7 +66,13 @@ namespace Benchmarking
         private EventSystem _eventSystem;
         public void RefreshEventSystem()
         {
-            EventSystem.SetUITookitEventSystemOverride(_eventSystem);
+            var target = _eventSystem != null ? _eventSystem : EventSystem.current;
+            if (target == null) return;
+            EventSystem.current = target;
+            var configuration = target.GetComponent<PanelInputConfiguration>();
+            if (configuration == null) configuration = target.gameObject.AddComponent<PanelInputConfiguration>();
+            configuration.autoCreatePanelComponents = true;
+            configuration.panelInputRedirection = PanelInputConfiguration.PanelInputRedirection.Always;
         }
         
         public bool liveRefreshGraph => _liveRefreshGraph;
@@ -189,7 +195,7 @@ namespace Benchmarking
             _instance = this;
             DontDestroyOnLoad(this);
 
-            var playerManager = FindFirstObjectByType<PlayerManager>();
+            var playerManager = FindAnyObjectByType<PlayerManager>();
             if (playerManager != null)
             {
                 playerManager.gameObject.SetActive(false);
@@ -317,7 +323,7 @@ namespace Benchmarking
         {
             UnityEngine.Object.Destroy(this.gameObject);
 
-            var playerManager = FindFirstObjectByType<PlayerManager>();
+            var playerManager = FindAnyObjectByType<PlayerManager>();
             if (playerManager != null)
             {
                 playerManager.gameObject.SetActive(true);

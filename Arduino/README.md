@@ -1,21 +1,12 @@
-## Prueba activa: VRy en A0
-
-El prefab usa Vertical Only A0: únicamente inclinación del barrel. A1 se ignora y el giro horizontal de Arduino queda deshabilitado. W/S y A/D siguen disponibles. Con USB desconectado, sustituir VRx por VRy en A0, conservando 5V y GND. No es necesario recargar firmware. Los modos horizontales descritos abajo quedan disponibles en Input Layout.
-
 # Cañón con Arduino y teclado
 
-## Configuración activa: solo VRx en A0
+## Configuración actual: dos joysticks independientes
 
-El prefab Arduino está configurado en **Input Layout = Horizontal Only A0**.
-Conectar +5V y GND del joystick a la placa y VRx a A0. El giro horizontal usa
-exclusivamente A0; A1 se ignora, aunque esté desconectado o entregue valores extremos.
-Arduino no cambia la inclinación del barrel en este modo. W/S sigue inclinando
-con teclado y A/D sigue girando. No hace falta volver a cargar el sketch: C1
-conserva sus campos físicos A0 y A1, y Unity asigna el canal a la acción elegida.
+Seleccionar **Horizontal A0 Vertical A1** en Input Layout del componente Arduino Controller (ya configurado en el prefab). VRx del joystick horizontal va a **A0**; VRy del joystick vertical va a **A1**. Ambos módulos comparten 5V y GND. Los otros ejes quedan sin conectar. W/S y A/D siguen funcionando.
 
-Para volver al montaje de dos ejes descrito abajo, seleccionar **Two Axes**
-(A0 vertical, A1 horizontal). **Horizontal Only A1** permite probar solo VRx en A1.
-Detener Play antes de cambiar la configuración que se quiere guardar.
+C1 transmite siempre los pines físicos en este orden: **C1,A0,A1,menu,disparo**. No intercambiar el orden del sketch: Unity asigna A0 al giro de la base y A1 a la inclinación local del Barrel. El Barrel acompaña el giro de la base, pero A0 no cambia su elevación.
+
+Los modos de un solo eje se conservan para diagnóstico. Two Axes es el cableado antiguo invertido y no corresponde al montaje actual.
 
 ## Estado y análisis del proyecto
 
@@ -50,8 +41,8 @@ Level_01 es la escena que actualmente tiene el cañón jugable. Level_02 y Level
 |---|---|---|
 | +5V | 5V Arduino | 5V Arduino |
 | GND | GND Arduino | GND Arduino |
-| VRy | A0 | Sin conectar |
-| VRx | Sin conectar | A1 |
+| VRy | A1 | Sin conectar |
+| VRx | Sin conectar | A0 |
 | SW | Sin conectar; se conservan los botones externos | Sin conectar |
 
 Cada joystick utiliza un solo eje. Las señales A0 y A1 deben estar en filas
@@ -67,8 +58,8 @@ Dos potenciómetros lineales de aproximadamente 10 kΩ y dos pulsadores normalme
 
 | Componente | Conexión |
 |---|---|
-| Potenciómetro vertical, terminal central | A0 |
-| Potenciómetro horizontal, terminal central | A1 |
+| Potenciómetro vertical, terminal central | A1 |
+| Potenciómetro horizontal, terminal central | A0 |
 | Terminales exteriores de ambos potenciómetros | VCC y GND |
 | Botón de menú | D2 a GND al presionar |
 | Botón disparo/confirmar | D3 a GND al presionar |
@@ -77,11 +68,11 @@ Dos potenciómetros lineales de aproximadamente 10 kΩ y dos pulsadores normalme
 ```text
 VCC ---[ potenciómetro 1 ]--- GND
                  |
-                 A0   (vertical)
+                 A1   (vertical)
 
 VCC ---[ potenciómetro 2 ]--- GND
                  |
-                 A1   (horizontal)
+                 A0   (horizontal)
 
 D2 -----[ botón menú ]------ GND
 D3 -----[ botón disparo ]--- GND
@@ -103,7 +94,7 @@ de canal y espera 200 microsegundos. Muestrea ambos canales aproximadamente cada
 1 ms y promedia las muestras acumuladas durante cada intervalo de envío de 25 ms,
 con un acumulador independiente por eje. Esto sustituye el promedio de ocho
 conversiones consecutivas, que no eliminaba las oscilaciones observadas entre paquetes.
-Los campos siguen siendo `C1,A0,A1,menu,disparo`: A0 solo controla W/S y A1 solo A/D.
+Los campos siguen siendo `C1,A0,A1,menu,disparo`: A1 solo controla W/S y A0 solo A/D.
 El filtrado no puede reparar un terminal central desconectado o unido al otro canal.
 Arduino documenta que una entrada desconectada puede fluctuar y depender de las otras
 entradas: [referencia analogRead](https://github.com/arduino/reference-en/blob/master/Language/Functions/Analog%20IO/analogRead.adoc).
@@ -126,7 +117,7 @@ capturas no demuestran qué cable o componente falla ni validan el recorrido com
 ASCII CSV con cinco campos y fin de línea LF (CRLF también se acepta):
 
 ```text
-C1,vertical,horizontal,menu,disparo
+C1,A0,A1,menu,disparo
 C1,512,300,0,1
 ```
 
@@ -148,8 +139,8 @@ No hay selector manual de dispositivo y el Input System permanece activo.
 
 | Acción | Teclado/control existente | Arduino |
 |---|---|---|
-| Inclinación | W/S, stick | Potenciómetro A0 |
-| Rotación horizontal | A/D, stick | Potenciómetro A1 |
+| Inclinación | W/S, stick | Joystick A1 |
+| Rotación horizontal | A/D, stick | Joystick A0 |
 | Disparo | Space / acción primaria original | D3, nueva pulsación |
 | Abrir/cerrar menú en partida | Esc / Start | D2, nueva pulsación |
 | Navegar por UI | Flechas/WASD según el módulo UI, ratón/control | Potenciómetro vertical |
@@ -177,7 +168,7 @@ En el **CannonController de Level_01**:
 - Aim Rotation Min/Max: ángulo X local permitido de la pieza barrel; actualmente −30° a +30°.
 - Turn Rotation Min/Max: giro Y local relativo a la orientación inicial de la base; actualmente −60° a +60°.
 - Aim Speed/Turn Speed: velocidades originales del teclado.
-- Arduino Smooth Time: 0,15 s para suavizar la orden; Arduino Max Speed: límite adicional de 90°/s. La velocidad efectiva utiliza Aim Speed para A0 y Turn Speed para A1, igual que el teclado.
+- Arduino Smooth Time: 0,15 s para suavizar la orden; Arduino Max Speed: límite adicional de 90°/s. La velocidad efectiva utiliza Aim Speed para A1 y Turn Speed para A0, igual que el teclado.
 - Shot Delay y Projectile Force: las restricciones existentes de disparo se comparten entre dispositivos.
 
 La inversión vertical predeterminada hace que un valor mayor eleve el cañón (X local negativo en este modelo). Invert permite ajustarlo al sentido del cableado. No se cambian padres, pivotes ni referencias de barrel, ruedas o punto de salida; se conservan los otros ejes locales.
@@ -192,7 +183,7 @@ La inversión vertical predeterminada hace que un valor mayor eleve el cañón (
 6. Primero comprobar W/S, A/D, Space y Esc con Arduino desconectado.
 7. Conectar Arduino, esperar la conexión y mover cada potenciómetro por separado. La conexión inicial no cambia la puntería.
 8. Ajustar Min/Max mirando Raw, luego inversión y sensibilidad. Si hay ruido, subir los umbrales antes de aumentar el suavizado.
-9. Pulsar D2 para abrir el menú; girar A0 para resaltar una opción y pulsar D3 para seleccionarla. D2 vuelve al juego. Probar también flechas/Enter/Esc.
+9. Pulsar D2 para abrir el menú; mover A1 para resaltar una opción y pulsar D3 para seleccionarla. D2 vuelve al juego. Probar también flechas/Enter/Esc.
 10. Si se cambian COM o Baud Rate durante Play, desactivar y activar **solo ArduinoSerial** para reiniciar el worker; también se aplican al volver a entrar en Play.
 11. Desconectar y reconectar USB durante la partida. El teclado debe seguir disponible y los botones mantenidos no deben activarse al reconectar.
 

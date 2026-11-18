@@ -61,7 +61,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e6d242712d0db9341a06c48939ea2e24, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ArduinoController
-  inputLayout: 0
+  inputLayout: 4
   vertical:
     min: 0
     max: 1023

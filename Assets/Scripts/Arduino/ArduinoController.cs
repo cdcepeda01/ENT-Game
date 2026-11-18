@@ -9,10 +9,10 @@ using UnityEngine.UI;
 public class ArduinoController : MonoBehaviour
 {
     public static ArduinoController Instance { get; private set; }
-    public enum InputLayout { TwoAxes, HorizontalOnlyA0, HorizontalOnlyA1, VerticalOnlyA0 }
-    [Tooltip("Two Axes: A0 inclina y A1 gira. Horizontal Only: solo gira desde el pin indicado; ignora el otro pin.")]
+    public enum InputLayout { TwoAxes, HorizontalOnlyA0, HorizontalOnlyA1, VerticalOnlyA0, HorizontalA0VerticalA1 }
+    [Tooltip("Horizontal A0 Vertical A1: VRx/A0 gira la base; VRy/A1 inclina el Barrel. Two Axes conserva el cableado antiguo.")]
     public InputLayout inputLayout = InputLayout.TwoAxes;
-    public bool VerticalInputEnabled => inputLayout == InputLayout.TwoAxes || inputLayout == InputLayout.VerticalOnlyA0;
+    public bool VerticalInputEnabled => inputLayout == InputLayout.TwoAxes || inputLayout == InputLayout.VerticalOnlyA0 || inputLayout == InputLayout.HorizontalA0VerticalA1;
     public bool HorizontalInputEnabled => inputLayout != InputLayout.VerticalOnlyA0;
     InputLayout activeLayout;
 
@@ -112,9 +112,9 @@ public class ArduinoController : MonoBehaviour
         }
     }
 
-    [Tooltip("Joystick 1, VRy en A0: solo inclinación, equivalente a W/S.")]
+    [Tooltip("VRy en A1: inclinación del Barrel, equivalente a W/S (Horizontal A0 Vertical A1).")]
     public Axis vertical = new Axis { invert = true };
-    [Tooltip("Joystick 2, VRx en A1: solo giro, equivalente a A/D.")]
+    [Tooltip("VRx en A0: giro de la base, equivalente a A/D (Horizontal A0 Vertical A1).")]
     public Axis horizontal = new Axis();
     [Tooltip("Vacío: busca el cañón activo al cambiar de escena.")]
     public CannonController cannon;
@@ -165,19 +165,21 @@ public class ArduinoController : MonoBehaviour
     public void ProcessFrame(ArduinoSerial.Frame frame)
     {
         if (activeLayout != inputLayout) ResetInput();
-        int horizontalReading = inputLayout == InputLayout.HorizontalOnlyA0 ? frame.Vertical : frame.Horizontal;
+        bool swapped = inputLayout == InputLayout.HorizontalA0VerticalA1;
+        int verticalReading = swapped ? frame.A1 : frame.A0;
+        int horizontalReading = swapped || inputLayout == InputLayout.HorizontalOnlyA0 ? frame.A0 : frame.A1;
         double now = frame.ReceivedAt / (double)System.Diagnostics.Stopwatch.Frequency;
         if (currentSession != frame.Session)
         {
             ResetInput();
             currentSession = frame.Session;
             menu.Reset(frame.Menu, now); fire.Reset(frame.Fire, now);
-            if (VerticalInputEnabled) vertical.Sample(frame.Vertical);
+            if (VerticalInputEnabled) vertical.Sample(verticalReading);
             if (HorizontalInputEnabled) horizontal.Sample(horizontalReading);
             HasInput = true;
             return; // Al reconectar, un botón mantenido requiere soltarse antes de actuar.
         }
-        bool vChanged = VerticalInputEnabled && vertical.Sample(frame.Vertical);
+        bool vChanged = VerticalInputEnabled && vertical.Sample(verticalReading);
         bool hChanged = HorizontalInputEnabled && horizontal.Sample(horizontalReading);
         bool menuPressed = menu.Sample(frame.Menu, now, buttonDebounce);
         bool firePressed = fire.Sample(frame.Fire, now, buttonDebounce);

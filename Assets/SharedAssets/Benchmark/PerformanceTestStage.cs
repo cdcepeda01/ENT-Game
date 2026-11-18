@@ -433,7 +433,7 @@ namespace Benchmarking
 
         private void DisableCamerasInScene()
         {
-            foreach (var camera in UnityEngine.Object.FindObjectsByType<Camera>(FindObjectsSortMode.None))
+            foreach (var camera in UnityEngine.Object.FindObjectsByType<Camera>())
             {
                 // Debug.Log("Found camera: " + camera.gameObject.name);
                 if (camera.gameObject != _testCamera.gameObject)

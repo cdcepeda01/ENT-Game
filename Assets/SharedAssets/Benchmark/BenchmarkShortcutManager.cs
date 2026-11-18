@@ -22,7 +22,7 @@ namespace Benchmarking
         [RuntimeInitializeOnLoadMethod]
         private static void GetOrCreate()
         {
-            s_instance = FindFirstObjectByType<BenchmarkShortcutManager>();
+            s_instance = FindAnyObjectByType<BenchmarkShortcutManager>();
             if (s_instance == null)
             {
                 var go = new GameObject("Benchmark Shortcut Manager");

@@ -28,6 +28,10 @@ public class ArduinoSerial : MonoBehaviour
     public sealed class Frame
     {
         public readonly int Vertical, Horizontal, Session;
+        // C1 transmite pines físicos: primer campo A0, segundo campo A1.
+        // Los nombres anteriores se conservan para compatibilidad.
+        public int A0 => Vertical;
+        public int A1 => Horizontal;
         public readonly bool Menu, Fire;
         public readonly long ReceivedAt;
         public Frame(int vertical, int horizontal, bool menu, bool fire, int session, long receivedAt)

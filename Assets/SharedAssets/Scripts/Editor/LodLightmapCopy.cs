@@ -17,7 +17,7 @@ class LodLightmapCopy : IProcessSceneWithReport
     
     public void OnProcessScene(Scene scene, BuildReport report)
     {
-        Execute();
+        Execute(scene);
     }
     
     [PostProcessBuild(1)]
@@ -57,7 +57,7 @@ class LodLightmapCopy : IProcessSceneWithReport
     
     private static void Execute(Scene scene)
     {
-        if(!m_enabled) return;
+        if(!m_enabled || !scene.IsValid() || !scene.isLoaded) return;
         if(Debug.isDebugBuild)
         
         //TODO: See if GameObject.FindObjectsOfType<LODGroup>(); works
@@ -74,6 +74,7 @@ class LodLightmapCopy : IProcessSceneWithReport
     private static void AssignLightmaps(LODGroup lodGroup)
     {
         var lods = lodGroup.GetLODs();
+        if (lods.Length == 0) return;
         var lod0 = lods[0].renderers;
             
         if(lod0.Length == 0 || lod0[0] == null || lod0[0].lightmapIndex == -1) return;
@@ -82,11 +83,12 @@ class LodLightmapCopy : IProcessSceneWithReport
         for (var i = 1; i < lods.Length; i++)
         {
             
-            for (var j = 0; j < lod0.Length; j++)
+            for (var j = 0; j < Mathf.Min(lod0.Length, lods[i].renderers.Length); j++)
             {
                 Renderer renderer = lods[i].renderers[j];
 
-                if (renderer == null) continue;
+                if (renderer == null || renderer.isPartOfStaticBatch || lod0[j] == null ||
+                    lod0[j].lightmapIndex < 0) continue;
                 
                 renderer.lightmapIndex = lod0[j].lightmapIndex;
                 renderer.lightmapScaleOffset = lod0[j].lightmapScaleOffset;
