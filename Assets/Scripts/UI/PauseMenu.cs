@@ -21,7 +21,7 @@ public class PauseMenu : MonoBehaviour
     public GameObject optionsPanel;
 
     [Tooltip("Nombre de la escena del menú principal.")]
-    public string mainMenuScene = "MainMenu";
+    public string mainMenuScene = "S1_Inicio";
 
     public bool IsOpen { get; private set; }
 

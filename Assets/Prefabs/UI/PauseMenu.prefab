@@ -1145,7 +1145,7 @@ MonoBehaviour:
   player: {fileID: 0}
   pausePanel: {fileID: 1929759328469330917}
   optionsPanel: {fileID: 1086284676594917195}
-  mainMenuScene: MainMenu
+  mainMenuScene: S1_Inicio
 --- !u!1 &3875991060313463762
 GameObject:
   m_ObjectHideFlags: 0

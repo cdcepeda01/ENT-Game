@@ -64,7 +64,17 @@ public class ControlPartida : MonoBehaviour
         if (terminada) return;
         puntos += enemigo != null ? enemigo.puntos : 10;
         ActualizarTextos();
+        if (DebeCelebrar(gameObject.scene.name, puntos))
+        {
+            terminada = true;
+            if (generador != null) generador.Detener();
+            if (puntos > Record) { PlayerPrefs.SetInt(ClaveRecord, puntos); PlayerPrefs.Save(); }
+            if (MenuManager.Instance != null) MenuManager.Instance.TerminarTutorial("S4_Felicidades");
+            else { Time.timeScale = 1f; UnityEngine.SceneManagement.SceneManager.LoadScene("S4_Felicidades"); }
+        }
     }
+
+    public static bool DebeCelebrar(string escena, int puntuacion) => escena == "S3_JuegoPrincipal" && puntuacion > 100;
 
     void ActualizarTextos()
     {

@@ -11,7 +11,7 @@ public static class CastilloWinterLook
     public static void Apply()
     {
         var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
-        if (EditorApplication.isPlaying || scene.name != "Level_Castillo") return;
+        if (EditorApplication.isPlaying || scene.name != "S3_JuegoPrincipal") return;
         var profile = AssetDatabase.LoadAssetAtPath<VolumeProfile>(ProfilePath);
         if (profile == null)
         {

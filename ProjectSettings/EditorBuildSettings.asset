@@ -6,22 +6,16 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Scenes/MainMenu.unity
-    guid: 2bb490750cb60e9478328e7fdce64add
+    path: Assets/Scenes/S1_Inicio.unity
+    guid: 6e24194d9746f7b47889cd352620bb5e
   - enabled: 1
-    path: Assets/Scenes/Base.unity
-    guid: be35efdf9d0373648b0c7374e1eb58e0
+    path: Assets/Scenes/S2_Tutorial.unity
+    guid: 07f7c4b2637a8424bb1ae43fd42d84ea
   - enabled: 1
-    path: Assets/Scenes/Level_01.unity
-    guid: c366b02cc931a0e4f8e089eccc6c6fe8
-  - enabled: 1
-    path: Assets/Scenes/Level_02.unity
-    guid: fe7b5d2f326009349acb0561b5d49939
-  - enabled: 1
-    path: Assets/Scenes/Level_Castillo.unity
+    path: Assets/Scenes/S3_JuegoPrincipal.unity
     guid: 7e36f3bc9b528d045848b488ec2b2dc5
   - enabled: 1
-    path: Assets/Scenes/Level_03.unity
-    guid: 07f7c4b2637a8424bb1ae43fd42d84ea
+    path: Assets/Scenes/S4_Felicidades.unity
+    guid: edb6a2ae5ec8473097337d498697c4ea
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}

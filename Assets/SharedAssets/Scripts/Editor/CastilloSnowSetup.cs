@@ -10,7 +10,7 @@ public static class CastilloSnowSetup
     {
         if (EditorApplication.isPlaying) return;
         var cannon = Object.FindAnyObjectByType<CannonController>();
-        if (cannon == null || cannon.gameObject.scene.name != "Level_Castillo") return;
+        if (cannon == null || cannon.gameObject.scene.name != "S3_JuegoPrincipal") return;
         const string steelPath = "Assets/UI/CannonWinter.mat";
         var steel = AssetDatabase.LoadAssetAtPath<Material>(steelPath);
         if (steel == null)

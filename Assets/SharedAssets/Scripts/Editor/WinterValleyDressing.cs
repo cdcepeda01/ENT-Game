@@ -16,7 +16,7 @@ public static class WinterValleyDressing
     {
         if (EditorApplication.isPlaying) return;
         var controller = Object.FindAnyObjectByType<CannonController>();
-        if (controller == null || controller.gameObject.scene.name != "Level_Castillo") return;
+        if (controller == null || controller.gameObject.scene.name != "S3_JuegoPrincipal") return;
         if (GameObject.Find("Winter Valley Scenery") != null)
         {
             PineMesh("PineSnowCaps", true);

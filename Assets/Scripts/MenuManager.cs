@@ -95,8 +95,9 @@ public class MenuManager : MonoBehaviour
 
     public void ToggleMenu()
     {
+        if (SceneManager.GetActiveScene().name == "S4_Felicidades") return;
         // La pantalla principal no tiene una partida a la que regresar.
-        if (isMainMenuShowing && SceneManager.GetActiveScene().name == "MainMenu") return;
+        if (isMainMenuShowing && SceneManager.GetActiveScene().name == escenaMenu) return;
         SetVisible(!isMainMenuShowing);
     }
 
@@ -147,8 +148,8 @@ public class MenuManager : MonoBehaviour
     public GameObject panelPausa;
 
     [Header("Escenas ")]
-    public string escenaMenu = "MainMenu";
-    public string escenaJuego = "Level_01";
+    public string escenaMenu = "S1_Inicio";
+    public string escenaJuego = "S3_JuegoPrincipal";
 
     bool viendoTutorial;
 
@@ -175,6 +176,12 @@ public class MenuManager : MonoBehaviour
     {
         viendoTutorial = false;
         CargarEscena(escenaJuego, false);
+    }
+
+    public void TerminarTutorial(string destino)
+    {
+        viendoTutorial = false;
+        CargarEscena(destino, false);
     }
 
     // Botón "Ver tutorial".
@@ -230,7 +237,7 @@ public class MenuManager : MonoBehaviour
     }
 
     [Header("Escena del tutorial")]
-    public string escenaTutorial = "Level_03";
+    public string escenaTutorial = "S2_Tutorial";
 
     void CargarEscena(string nombre, bool mostrarMenu)
     {

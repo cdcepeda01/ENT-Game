@@ -707,9 +707,9 @@ MonoBehaviour:
   panelInicio: {fileID: 4221852954134054525}
   panelTutorial: {fileID: 0}
   panelPausa: {fileID: 8162123894327447197}
-  escenaMenu: MainMenu
-  escenaJuego: Level_01
-  escenaTutorial: Level_03
+  escenaMenu: S1_Inicio
+  escenaJuego: S3_JuegoPrincipal
+  escenaTutorial: S2_Tutorial
   panelFin: {fileID: 4916797066394420103}
   textoPuntajeFin: {fileID: 3988177602661088466}
   textoRecordFin: {fileID: 1633550339475490096}

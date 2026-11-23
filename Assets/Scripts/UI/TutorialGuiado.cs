@@ -27,10 +27,13 @@ public class TutorialGuiado : MonoBehaviour
     [Header("Cajas (agregado)")]
     [Tooltip("Grupo con las cajas de práctica. Solo se ve en el tutorial.")]
     public GameObject cajasTutorial;
+    public GameObject dianasTutorial;
+    TutorialTarget[] dianas = new TutorialTarget[0];
     [Tooltip("Grupo con las cajas del juego. Se oculta durante el tutorial.")]
     public GameObject cajasJuego;
-    [Tooltip("Al terminar el tutorial, arranca el juego normal con las cajas del juego.")]
+    [Tooltip("Al terminar el tutorial, carga la escena indicada abajo.")]
     public bool iniciarJuegoAlFinal = true;
+    public string escenaAlTerminar = "S3_JuegoPrincipal";
     [Tooltip("Actívalo si esta escena es solo para el tutorial: así también aparece al Reiniciar.")]
     public bool siempreMostrar = false;
 
@@ -69,7 +72,12 @@ public class TutorialGuiado : MonoBehaviour
         Activo = false; // Reiniciar o volver a entrar con "Jugar" no repite el tutorial.
         if (panel != null) panel.SetActive(false);
         // Cajas de práctica solo en el tutorial; cajas del juego solo en el juego.
-        if (cajasTutorial != null) cajasTutorial.SetActive(mostrar);
+        if (cajasTutorial != null) cajasTutorial.SetActive(mostrar && dianasTutorial == null);
+        if (dianasTutorial != null)
+        {
+            dianasTutorial.SetActive(mostrar);
+            dianas = dianasTutorial.GetComponentsInChildren<TutorialTarget>(true);
+        }
         if (cajasJuego != null) cajasJuego.SetActive(!mostrar);
         if (!mostrar) { enabled = false; return; }
         if (cannon == null) cannon = FindAnyObjectByType<CannonController>();
@@ -106,6 +114,19 @@ public class TutorialGuiado : MonoBehaviour
 
         // Paso 4: derribar las cajas de práctica (o una caja del juego si no hay grupo de práctica).
         Mostrar(4, pasoObjetivo);
+        if (dianas.Length > 0)
+        {
+            while (true)
+            {
+                int hits = 0;
+                foreach (var target in dianas) if (target != null && target.Hit) hits++;
+                if (textoPaso != null) textoPaso.text = $"Paso 4 de 4 · Dianas acertadas: {hits}/{dianas.Length}";
+                if (hits == dianas.Length) break;
+                yield return null;
+            }
+        }
+        else
+        {
         var cajas = new List<Transform>();
         var posiciones = new List<Vector3>();
         if (cajasTutorial != null)
@@ -134,6 +155,7 @@ public class TutorialGuiado : MonoBehaviour
             if (movidas >= necesarias) break;
             yield return null;
         }
+        }
         yield return Bien();
 
         // Final.
@@ -143,11 +165,11 @@ public class TutorialGuiado : MonoBehaviour
         yield return new WaitForSeconds(segundosFinal);
         if (panel != null) panel.SetActive(false);
 
-        // Arranca el juego real (misma escena, ya sin tutorial y con las cajas del juego).
+        // Carga el nivel de juego al completar el tutorial.
         if (iniciarJuegoAlFinal)
         {
-            if (MenuManager.Instance != null) MenuManager.Instance.Jugar();
-            else SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+            if (MenuManager.Instance != null) MenuManager.Instance.TerminarTutorial(escenaAlTerminar);
+            else { Time.timeScale = 1f; SceneManager.LoadScene(escenaAlTerminar); }
         }
     }
 

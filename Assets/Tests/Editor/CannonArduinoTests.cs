@@ -241,7 +241,7 @@ public class CannonArduinoTests
     public IEnumerator CastilloJoysticksMoveOnlyTheirAssignedTransform()
     {
         yield return new EnterPlayMode();
-        SceneManager.LoadScene("Level_Castillo");
+        SceneManager.LoadScene("S3_JuegoPrincipal");
         yield return null;
         var cannon = Object.FindAnyObjectByType<CannonController>();
         var serial = ArduinoSerial.Instance;
@@ -513,7 +513,7 @@ public class CannonArduinoTests
     public IEnumerator MainMenuLoadsCannonAndReusesPersistentComponents()
     {
         yield return new EnterPlayMode();
-        SceneManager.LoadScene("MainMenu");
+        SceneManager.LoadScene("S1_Inicio");
         yield return null;
         MenuManager menu = MenuManager.Instance;
         ArduinoSerial serial = ArduinoSerial.Instance;
